@@ -90,7 +90,8 @@ Binaries will be created in the `bin/` directory.
 ```
 
 When no filename is provided, it auto-generates one using the format:
-`name_type_element_uid.bin` (e.g., `jawbreaker_trap_master_tech_cfd6e5fa.bin`)
+- Regular Skylanders: `name_game_element_uid.bin`
+- Creation Crystals/Traps: `type_game_element_uid.bin` (avoids redundancy)
 
 Example output:
 ```
@@ -103,9 +104,14 @@ Reading Sector 0:
 Skylander: Jawbreaker (Trap Master, Tech)
 Reading ALL Sectors:
     ...............    Done.
-Dumping to file jawbreaker_trap_master_tech_cfd6e5fa.bin:
+Dumping to file jawbreaker_trap_team_tech_cfd6e5fa.bin:
     Done.
 ```
+
+Example filenames:
+- `jawbreaker_trap_team_tech_cfd6e5fa.bin` (Trap Master from Trap Team)
+- `spyro_spyros_adventure_magic_12345678.bin` (Original Spyro)
+- `creation_crystal_imaginators_fire_9f8909af.bin` (Fire Creation Crystal)
 
 ### Cloning to a Blank Card
 
