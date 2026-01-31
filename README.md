@@ -82,8 +82,15 @@ Binaries will be created in the `bin/` directory.
 3. Run:
 
 ```bash
+# Auto-generate filename from Skylander info
+./bin/sky-dump
+
+# Or specify a custom filename
 ./bin/sky-dump -f skylander_backup.bin
 ```
+
+When no filename is provided, it auto-generates one using the format:
+`name_type_element_uid.bin` (e.g., `jawbreaker_trap_master_tech_cfd6e5fa.bin`)
 
 Example output:
 ```
@@ -96,7 +103,7 @@ Reading Sector 0:
 Skylander: Jawbreaker (Trap Master, Tech)
 Reading ALL Sectors:
     ...............    Done.
-Dumping to file skylander_backup.bin:
+Dumping to file jawbreaker_trap_master_tech_cfd6e5fa.bin:
     Done.
 ```
 
@@ -191,7 +198,7 @@ During verification:
 Usage: sky-dump [OPTIONS]
 
 Options:
-  -f <filename>    Output BIN filename (required)
+  -f <filename>    Output BIN filename (optional - auto-generates if not provided)
   -h, --help       Show help
 ```
 
