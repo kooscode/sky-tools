@@ -8,6 +8,7 @@
 #include "appError.hpp"
 #include "acr122u.hpp"
 #include "skylanderNFC.hpp"
+#include "skylanderDB.hpp"
 
 
 int main(int argc, char** argv) 
@@ -93,6 +94,19 @@ int main(int argc, char** argv)
 		uint8_t card_uid[NFC_UID_SIZE];
 		memcpy(card_uid, card_sectors[0].blk0, NFC_UID_SIZE);
 		std::cout << "Done. [UID=" << xk::skylanderNFC::toHexStr(card_uid, NFC_UID_SIZE) << "]" << std::endl;
+
+		// Identify Skylander
+		uint8_t* card_data = reinterpret_cast<uint8_t*>(card_sectors);
+		uint16_t charId = xk::skylanderDB::getCharacterId(card_data);
+		const xk::SkylanderInfo* info = xk::skylanderDB::getInfo(charId);
+		if (info)
+		{
+			std::cout << "Skylander: " << info->name << " (" << xk::skylanderDB::getTypeString(info->type) << ", " << info->element << ")" << std::endl;
+		}
+		else
+		{
+			std::cout << "Skylander: Unknown (ID: 0x" << std::hex << charId << std::dec << ")" << std::endl;
+		}
 
 		// Read ALL Sectors
 		std::cout << "Reading ALL Sectors:" << std::endl << "\t";

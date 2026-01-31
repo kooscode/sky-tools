@@ -9,7 +9,7 @@ LIB_DIR = lib
 OBJ_DIR = obj
 
 # Tools
-TOOLS = sky-dump sky-clone
+TOOLS = sky-dump sky-clone sky-reset
 
 # Compiler settings
 CXX = g++
@@ -30,7 +30,7 @@ LIB_SOURCES = $(wildcard $(LIB_DIR)/*.cpp)
 LIB_OBJECTS = $(patsubst $(LIB_DIR)/%.cpp,$(OBJ_DIR)/%.o,$(LIB_SOURCES))
 
 # Default target: build all tools
-.PHONY: all clean sky-dump sky-clone
+.PHONY: all clean sky-dump sky-clone sky-reset
 
 all: $(TOOLS)
 
@@ -61,10 +61,18 @@ sky-clone: $(OUT_DIR) $(LIB_OBJECTS)
 		-o $(OUT_DIR)/sky-clone \
 		$(INCLUDES) $(LIBS)
 
+# Build sky-reset
+sky-reset: $(OUT_DIR) $(LIB_OBJECTS)
+	$(CXX) $(CFLAGS) -std=$(CPP_STD) $(DEFS) \
+		sky-reset/src/sky-reset.cpp \
+		$(LIB_OBJECTS) \
+		-o $(OUT_DIR)/sky-reset \
+		$(INCLUDES) $(LIBS)
+
 # Clean build artifacts
 clean:
 	rm -rf $(OBJ_DIR)
-	rm -f $(OUT_DIR)/sky-dump $(OUT_DIR)/sky-clone
+	rm -f $(OUT_DIR)/sky-dump $(OUT_DIR)/sky-clone $(OUT_DIR)/sky-reset
 
 # Install dependencies (Debian/Ubuntu)
 install-deps:
@@ -78,6 +86,7 @@ help:
 	@echo "  all          - Build all tools (default)"
 	@echo "  sky-dump     - Build sky-dump only"
 	@echo "  sky-clone    - Build sky-clone only"
+	@echo "  sky-reset    - Build sky-reset only"
 	@echo "  clean        - Remove build artifacts"
 	@echo "  install-deps - Install required dependencies (Debian/Ubuntu)"
 	@echo "  help         - Show this help message"

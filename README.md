@@ -1,14 +1,26 @@
 # sky-tools
 
-Tools for dumping and cloning Skylander NFC figures using an ACR122U USB NFC reader/writer.
+Tools for dumping, cloning, and resetting Skylander NFC figures using an ACR122U USB NFC reader/writer.
 
 ## Features
 
 - **sky-dump**: Read NFC data from a Skylander figure and save to a binary file
 - **sky-clone**: Clone Skylander data from a binary file to a blank NFC card
+- **sky-reset**: Factory reset a Skylander (zero XP, money, skills, hats, hero points)
+- **Skylander Identification**: Automatically identifies 180+ characters from all games
 - Automatic UID rewriting for "magic" NFC cards
 - Write verification to ensure successful cloning
 - Support for all Skylander figure types (1KB MIFARE Classic)
+
+## Supported Games
+
+All Skylanders from every game are supported:
+- Spyro's Adventure (2011)
+- Giants (2012)
+- SWAP Force (2013)
+- Trap Team (2014)
+- SuperChargers (2015)
+- Imaginators (2016) - including Senseis and Creation Crystals
 
 ## Requirements
 
@@ -80,7 +92,8 @@ Looking for ACR122U NFC Reader/Writer...
     Connected.
 Sector 0 Access Authorized
 Reading Sector 0:
-    Done. [UID=9F8909AF]
+    Done. [UID=CFD6E5FA]
+Skylander: Jawbreaker (Trap Master, Tech)
 Reading ALL Sectors:
     ...............    Done.
 Dumping to file skylander_backup.bin:
@@ -102,19 +115,59 @@ Dumping to file skylander_backup.bin:
 Example output:
 ```
 STEP 1: Reading Skylander file "skylander_backup.bin"
-    Skylander File UID : [UID=9F8909AF]
+    Skylander File UID : [UID=CFD6E5FA]
+    Skylander: Jawbreaker (Trap Master, Tech)
 STEP 2: Connecting to ACR122U NFC Reader
     Found: ACS ACR122U PICC Interface 01 00
     Connected.
 STEP 3: Authenticating Card and Ensure Skylander UID Match
     Authorized (Default KeyA)
-    Reading Sector 0: Done [UID=9F8909AF]
+    Reading Sector 0: Done [UID=CFD6E5FA]
     UID's match - proceeding with clone
 STEP 4: Cloning Skylander Sectors:
 [dARW0_4][dARW0_4]...[dARW0_4]
 STEP 5: Verifying Written Data:
 [ARV][ARV]...[ARV]
 Clone Complete - Verification PASSED!
+```
+
+### Resetting a Skylander
+
+Reset a Skylander to factory blank state (removes all progress):
+
+```bash
+# Reset using NFC reader (place Skylander on reader)
+./bin/sky-reset
+
+# Reset from a dump file
+./bin/sky-reset -f skylander_backup.bin -o skylander_reset.bin
+
+# Dry run (show what would happen without making changes)
+./bin/sky-reset -f skylander_backup.bin -n
+```
+
+Example output:
+```
+STEP 1: Reading Skylander from file "skylander_backup.bin"
+    Skylander UID: CFD6E5FA
+    Skylander: Jawbreaker (Trap Master, Tech)
+STEP 2: Decrypting Skylander data
+    Decryption complete.
+    Active Area: 0
+    Current XP: 6707094
+    Current Money: 49160
+    Sequence counters: Area0=158, Area1=29
+STEP 3: Resetting Skylander data
+    Cleared XP, Money, Skills, Hats, Hero data
+    New sequence counter: 159
+STEP 4: Recalculating checksums
+    Checksums updated.
+STEP 5: Re-encrypting Skylander data
+    Encryption complete.
+STEP 6: Writing reset Skylander to file "skylander_reset.bin"
+    Done.
+
+Reset Complete!
 ```
 
 ### Output Legend
@@ -151,12 +204,24 @@ Options:
   -h, --help       Show help
 ```
 
+### sky-reset
+```
+Usage: sky-reset [OPTIONS]
+
+Options:
+  -f, --file <filename>    Input BIN file (if not using NFC reader)
+  -o, --output <filename>  Output BIN file (default: overwrite input or write to card)
+  -n, --dry-run            Don't write changes, just show what would happen
+  -h, --help               Show help
+```
+
 ## How It Works
 
 ### Skylander NFC Structure
 - Skylanders use MIFARE Classic 1K NFC chips (1024 bytes)
 - 16 sectors, 4 blocks per sector (64 bytes per sector)
 - Sector 0 contains the UID and Skylander identification
+- Character ID stored at offset 0x10 (used for identification)
 - Each sector is protected with computed keys based on the UID
 
 ### Key Generation
@@ -164,11 +229,31 @@ Options:
 - Sectors 1-15 use keys computed via CRC48 algorithm using the card UID
 - This ensures each Skylander has unique sector keys
 
+### Data Encryption
+- Blocks 8+ are encrypted using AES-128-ECB
+- Key derived from: MD5(sector0[0:32] + blockIndex + Activision copyright string)
+- Two data areas (blocks 0x08-0x0F and 0x24-0x2F) for redundancy
+- Sequence counter determines which area is active
+
+### Checksums
+- CRC-16/CCITT-FALSE checksums protect data integrity
+- Type 0: Sector 0 validation
+- Type 1: Data area header
+- Type 2: First data blocks
+- Type 3: Remaining data blocks
+
 ### Cloning Process
 1. Read source Skylander data including UID
 2. If target card UID doesn't match, rewrite block 0 (requires magic card)
 3. Authenticate and write all sectors with appropriate keys
 4. Verify all written data matches source
+
+### Reset Process
+1. Read and decrypt Skylander data
+2. Zero out XP, money, skills, hats, hero points, heroic challenges
+3. Increment sequence counter
+4. Recalculate all checksums
+5. Re-encrypt and write back
 
 ## Troubleshooting
 
@@ -206,3 +291,4 @@ GNU Lesser General Public License v2.1 - see [LICENSE](LICENSE)
 
 - Original code by Koos du Preez (kdupreez@hotmail.com)
 - Skylander key algorithm from [nfc.toys](https://nfc.toys/interop-sky.html)
+- Character ID database from [skylandersNFC](https://gist.github.com/skylandersNFC/4f0348c7e66fe9ab28e2ac3b82e549e2)
