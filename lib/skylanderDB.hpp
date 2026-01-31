@@ -45,12 +45,25 @@ namespace xk
         SKY_TYPE_CREATION_CRYSTAL // Imaginators creation crystals
     };
 
+    // Game generations
+    enum SkylanderGame
+    {
+        SKY_GAME_UNKNOWN = 0,
+        SKY_GAME_SPYROS_ADVENTURE,  // 2011
+        SKY_GAME_GIANTS,            // 2012
+        SKY_GAME_SWAP_FORCE,        // 2013
+        SKY_GAME_TRAP_TEAM,         // 2014
+        SKY_GAME_SUPERCHARGERS,     // 2015
+        SKY_GAME_IMAGINATORS        // 2016
+    };
+
     struct SkylanderInfo
     {
         uint16_t id;
         const char* name;
         SkylanderType type;
         const char* element;
+        SkylanderGame game;
     };
 
     class skylanderDB
@@ -66,6 +79,9 @@ namespace xk
 
         // Get Skylander type as string
         static const char* getTypeString(SkylanderType type);
+
+        // Get game/generation as string
+        static const char* getGameString(SkylanderGame game);
 
         // Get character ID from raw card data
         static uint16_t getCharacterId(const uint8_t* data);

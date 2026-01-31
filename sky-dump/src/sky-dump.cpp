@@ -12,29 +12,40 @@
 #include "skylanderNFC.hpp"
 #include "skylanderDB.hpp"
 
-// Generate a filename from Skylander info: name_type_element_UID.bin
+// Generate a filename from Skylander info
+// Format: name_game_element_UID.bin (or type_game_element_UID.bin for Creation Crystals/Traps)
 std::string generateFilename(const xk::SkylanderInfo* info, uint16_t charId, const uint8_t* uid)
 {
-	std::string name, type, element;
+	std::string filename;
 
 	if (info)
 	{
-		name = info->name;
-		type = xk::skylanderDB::getTypeString(info->type);
-		element = info->element;
+		std::string game = xk::skylanderDB::getGameString(info->game);
+		std::string element = info->element;
+
+		// For Creation Crystals and Traps, the name is redundant with type+element
+		// Use: type_game_element_uid instead of name_game_element_uid
+		if (info->type == xk::SKY_TYPE_CREATION_CRYSTAL || info->type == xk::SKY_TYPE_TRAP)
+		{
+			std::string type = xk::skylanderDB::getTypeString(info->type);
+			filename = type + "_" + game + "_" + element;
+		}
+		else
+		{
+			// Regular Skylanders: name_game_element_uid
+			filename = std::string(info->name) + "_" + game + "_" + element;
+		}
 	}
 	else
 	{
 		// Unknown Skylander - use ID
 		char buf[32];
-		snprintf(buf, sizeof(buf), "Unknown_%04X", charId);
-		name = buf;
-		type = "Skylander";
-		element = "Unknown";
+		snprintf(buf, sizeof(buf), "unknown_%04X", charId);
+		filename = buf;
 	}
 
-	// Build filename: name_type_element_UID.bin
-	std::string filename = name + "_" + type + "_" + element + "_" + xk::skylanderNFC::toHexStr(uid, NFC_UID_SIZE);
+	// Add UID for uniqueness
+	filename += "_" + xk::skylanderNFC::toHexStr(uid, NFC_UID_SIZE);
 
 	// Convert to lowercase and replace spaces/special chars with underscores
 	std::transform(filename.begin(), filename.end(), filename.begin(), [](unsigned char c) {
