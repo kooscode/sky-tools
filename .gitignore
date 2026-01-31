@@ -1,0 +1,17 @@
+# Build artifacts
+bin/
+obj/
+
+# Editor files
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test dumps
+*.bin
+.claude/
