@@ -3,6 +3,8 @@
 #include <sstream>
 #include <string.h>
 #include <vector>
+#include <algorithm>
+#include <cctype>
 
 #include "cxxopts.hpp"
 #include "appError.hpp"
@@ -10,10 +12,62 @@
 #include "skylanderNFC.hpp"
 #include "skylanderDB.hpp"
 
+// Generate a filename from Skylander info: name_type_element_UID.bin
+std::string generateFilename(const xk::SkylanderInfo* info, uint16_t charId, const uint8_t* uid)
+{
+	std::string name, type, element;
 
-int main(int argc, char** argv) 
-{   
+	if (info)
+	{
+		name = info->name;
+		type = xk::skylanderDB::getTypeString(info->type);
+		element = info->element;
+	}
+	else
+	{
+		// Unknown Skylander - use ID
+		char buf[32];
+		snprintf(buf, sizeof(buf), "Unknown_%04X", charId);
+		name = buf;
+		type = "Skylander";
+		element = "Unknown";
+	}
+
+	// Build filename: name_type_element_UID.bin
+	std::string filename = name + "_" + type + "_" + element + "_" + xk::skylanderNFC::toHexStr(uid, NFC_UID_SIZE);
+
+	// Convert to lowercase and replace spaces/special chars with underscores
+	std::transform(filename.begin(), filename.end(), filename.begin(), [](unsigned char c) {
+		if (c == ' ' || c == '-' || c == '.' || c == '\'')
+			return (int)'_';
+		return (int)std::tolower(c);
+	});
+
+	// Remove consecutive underscores
+	std::string result;
+	bool lastWasUnderscore = false;
+	for (char c : filename)
+	{
+		if (c == '_')
+		{
+			if (!lastWasUnderscore)
+				result += c;
+			lastWasUnderscore = true;
+		}
+		else
+		{
+			result += c;
+			lastWasUnderscore = false;
+		}
+	}
+
+	return result + ".bin";
+}
+
+int main(int argc, char** argv)
+{
 	std::string sky_file_name = "";
+	bool autoFilename = false;
 	const uint8_t SKYKEY[] = SKYLANDER_BLOCK_0_KEY_A;
 	const uint8_t DEFAULTKEY[] = NFC_DEFAULT_KEY_A;
 	xk::acr122u::NFC_Sector card_sectors[NFC_SECTORS_PER_CARD];
@@ -21,30 +75,36 @@ int main(int argc, char** argv)
 	//setup cmdline options
 	cxxopts::Options app_options("sky-dump", "Skylander NFC Dumper.");
 	app_options.add_options()
-  		("f", "Target BIN filename", cxxopts::value<std::string>())
+		("f", "Target BIN filename (optional - auto-generates from Skylander info if not provided)", cxxopts::value<std::string>())
 		("h,help", "Show Syntax");
 
 	// parse supplied options
 	cxxopts::ParseResult app_params;
-	try 
+	try
 	{
 		app_params = app_options.parse(argc, argv);
-	} 
+	}
 	catch (const cxxopts::exceptions::exception& e)
 	{
-    	std::cout << app_options.help() << std::endl;
-		exit(-1);
+		std::cout << app_options.help() << std::endl;
+		return -1;
 	}
 
-    // print help if required..
-	if ((app_params.count("h")) || (app_params.count("f") > 0))
+	// print help if required
+	if (app_params.count("help"))
 	{
-		sky_file_name =  app_params["f"].as<std::string>();
+		std::cout << app_options.help() << std::endl;
+		return 0;
+	}
+
+	// Check if filename provided
+	if (app_params.count("f") > 0)
+	{
+		sky_file_name = app_params["f"].as<std::string>();
 	}
 	else
 	{
-    	std::cout << app_options.help() << std::endl;
-		exit(-1);
+		autoFilename = true;
 	}
 
 	//Connect to card reader and dump to file..
@@ -106,6 +166,12 @@ int main(int argc, char** argv)
 		else
 		{
 			std::cout << "Skylander: Unknown (ID: 0x" << std::hex << charId << std::dec << ")" << std::endl;
+		}
+
+		// Generate filename if not provided
+		if (autoFilename)
+		{
+			sky_file_name = generateFilename(info, charId, card_uid);
 		}
 
 		// Read ALL Sectors
