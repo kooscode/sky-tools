@@ -170,7 +170,7 @@ int main(int argc, char** argv)
 	const xk::SkylanderInfo* info = xk::skylanderDB::getInfo(charId);
 	if (info)
 	{
-		std::cout << "\tSkylander: " << info->name << " (" << xk::skylanderDB::getTypeString(info->type) << ", " << info->element << ")" << std::endl;
+		std::cout << "\tSkylander: " << info->name << " (" << xk::skylanderDB::getTypeString(info->type) << ", " << xk::skylanderDB::getElementString(info->element) << ")" << std::endl;
 	}
 	else
 	{

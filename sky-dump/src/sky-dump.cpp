@@ -21,7 +21,7 @@ std::string generateFilename(const xk::SkylanderInfo* info, uint16_t charId, con
 	if (info)
 	{
 		std::string game = xk::skylanderDB::getGameString(info->game);
-		std::string element = info->element;
+		std::string element = xk::skylanderDB::getElementString(info->element);
 
 		// For Creation Crystals and Traps, the name is redundant with type+element
 		// Use: type_game_element_uid instead of name_game_element_uid
@@ -172,7 +172,7 @@ int main(int argc, char** argv)
 		const xk::SkylanderInfo* info = xk::skylanderDB::getInfo(charId);
 		if (info)
 		{
-			std::cout << "Skylander: " << info->name << " (" << xk::skylanderDB::getTypeString(info->type) << ", " << info->element << ")" << std::endl;
+			std::cout << "Skylander: " << info->name << " (" << xk::skylanderDB::getTypeString(info->type) << ", " << xk::skylanderDB::getElementString(info->element) << ")" << std::endl;
 		}
 		else
 		{

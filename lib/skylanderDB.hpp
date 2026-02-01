@@ -57,12 +57,29 @@ namespace xk
         SKY_GAME_IMAGINATORS        // 2016
     };
 
+    // Elements
+    enum SkylanderElement
+    {
+        SKY_ELEMENT_NONE = 0,
+        SKY_ELEMENT_AIR,
+        SKY_ELEMENT_EARTH,
+        SKY_ELEMENT_FIRE,
+        SKY_ELEMENT_WATER,
+        SKY_ELEMENT_MAGIC,
+        SKY_ELEMENT_TECH,
+        SKY_ELEMENT_LIFE,
+        SKY_ELEMENT_UNDEAD,
+        SKY_ELEMENT_LIGHT,
+        SKY_ELEMENT_DARK,
+        SKY_ELEMENT_KAOS
+    };
+
     struct SkylanderInfo
     {
         uint16_t id;
         const char* name;
         SkylanderType type;
-        const char* element;
+        SkylanderElement element;
         SkylanderGame game;
     };
 
@@ -82,6 +99,9 @@ namespace xk
 
         // Get game/generation as string
         static const char* getGameString(SkylanderGame game);
+
+        // Get element as string
+        static const char* getElementString(SkylanderElement element);
 
         // Get character ID from raw card data
         static uint16_t getCharacterId(const uint8_t* data);

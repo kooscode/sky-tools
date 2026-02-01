@@ -241,7 +241,7 @@ int main(int argc, char** argv)
     const SkylanderInfo* info = skylanderDB::getInfo(charId);
     if (info)
     {
-        std::cout << "\tSkylander: " << info->name << " (" << skylanderDB::getTypeString(info->type) << ", " << info->element << ")" << std::endl;
+        std::cout << "\tSkylander: " << info->name << " (" << skylanderDB::getTypeString(info->type) << ", " << skylanderDB::getElementString(info->element) << ")" << std::endl;
     }
     else
     {
