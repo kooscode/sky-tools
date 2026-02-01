@@ -46,6 +46,37 @@ using namespace xk;
 #define FIELD_HERO_CHAL_OFFSET 0x06 // 4 bytes (heroic challenges bitmask)
 #define FIELD_HERO_PTS_OFFSET  0x0A // 1 byte (hero points)
 
+// Find next available backup filename (reset_backup_0.bin, reset_backup_1.bin, etc.)
+std::string getNextBackupFilename()
+{
+    int index = 0;
+    std::string filename;
+    while (true)
+    {
+        filename = "reset_backup_" + std::to_string(index) + ".bin";
+        std::ifstream test(filename);
+        if (!test.good())
+        {
+            break;
+        }
+        index++;
+    }
+    return filename;
+}
+
+// Write backup file
+bool writeBackup(const uint8_t* data, const std::string& filename)
+{
+    std::ofstream backupFile(filename, std::ios::binary);
+    if (!backupFile.is_open())
+    {
+        return false;
+    }
+    backupFile.write(reinterpret_cast<const char*>(data), NFC_CARD_SIZE);
+    backupFile.close();
+    return true;
+}
+
 // Reset a single data area (blocks starting at areaBlock)
 void resetDataArea(uint8_t* data, uint8_t areaBlock, uint8_t newSequence)
 {
@@ -236,6 +267,19 @@ int main(int argc, char** argv)
         std::cout << "\tSkylander UID: " << skylanderNFC::toHexStr(uid, NFC_UID_SIZE) << std::endl;
     }
 
+    // Auto backup before reset
+    std::string backupFilename = getNextBackupFilename();
+    std::cout << "STEP 2:\tCreating backup \"" << backupFilename << "\"" << std::endl;
+    if (writeBackup(data, backupFilename))
+    {
+        std::cout << "\tBackup saved." << std::endl;
+    }
+    else
+    {
+        std::cout << "** ERROR: Failed to create backup file!" << std::endl;
+        return -1;
+    }
+
     // Identify Skylander (character ID is not encrypted)
     uint16_t charId = skylanderDB::getCharacterId(data);
     const SkylanderInfo* info = skylanderDB::getInfo(charId);
@@ -249,7 +293,7 @@ int main(int argc, char** argv)
     }
 
     // Decrypt the data
-    std::cout << "STEP 2:\tDecrypting Skylander data" << std::endl;
+    std::cout << "STEP 3:\tDecrypting Skylander data" << std::endl;
     skylanderCrypto::decryptSkylander(data);
     std::cout << "\tDecryption complete." << std::endl;
 
@@ -268,7 +312,7 @@ int main(int argc, char** argv)
     std::cout << "\tSequence counters: Area0=" << (int)seq0 << ", Area1=" << (int)seq1 << std::endl;
 
     // Perform reset
-    std::cout << "STEP 3:\tResetting Skylander data" << std::endl;
+    std::cout << "STEP 4:\tResetting Skylander data" << std::endl;
 
     // Determine new sequence numbers
     uint8_t maxSeq = (seq0 > seq1) ? seq0 : seq1;
@@ -282,13 +326,13 @@ int main(int argc, char** argv)
     std::cout << "\tNew sequence counter: " << (int)newSeq << std::endl;
 
     // Update checksums
-    std::cout << "STEP 4:\tRecalculating checksums" << std::endl;
+    std::cout << "STEP 5:\tRecalculating checksums" << std::endl;
     skylanderCrypto::updateAreaChecksums(data, SKY_AREA0_BLOCK);
     skylanderCrypto::updateAreaChecksums(data, SKY_AREA1_BLOCK);
     std::cout << "\tChecksums updated." << std::endl;
 
     // Re-encrypt
-    std::cout << "STEP 5:\tRe-encrypting Skylander data" << std::endl;
+    std::cout << "STEP 6:\tRe-encrypting Skylander data" << std::endl;
     skylanderCrypto::encryptSkylander(data);
     std::cout << "\tEncryption complete." << std::endl;
 
@@ -301,7 +345,7 @@ int main(int argc, char** argv)
     // Write back
     if (useNFC)
     {
-        std::cout << "STEP 6:\tWriting reset Skylander to NFC card" << std::endl;
+        std::cout << "STEP 7:\tWriting reset Skylander to NFC card" << std::endl;
 
         try
         {
@@ -334,7 +378,7 @@ int main(int argc, char** argv)
             std::cout << " Done." << std::endl;
 
             // Verify
-            std::cout << "STEP 7:\tVerifying written data" << std::endl;
+            std::cout << "STEP 8:\tVerifying written data" << std::endl;
             acr122u::NFC_Sector verifySectors[NFC_SECTORS_PER_CARD];
             bool verifyOk = true;
 
@@ -386,7 +430,7 @@ int main(int argc, char** argv)
     {
         // Write to file
         std::string outFile = outputFileName.empty() ? inputFileName : outputFileName;
-        std::cout << "STEP 6:\tWriting reset Skylander to file \"" << outFile << "\"" << std::endl;
+        std::cout << "STEP 7:\tWriting reset Skylander to file \"" << outFile << "\"" << std::endl;
 
         std::ofstream outfile(outFile, std::ios::binary);
         if (!outfile.is_open())
