@@ -169,14 +169,34 @@ int main(int argc, char** argv)
 		// Identify Skylander
 		uint8_t* card_data = reinterpret_cast<uint8_t*>(card_sectors);
 		uint16_t charId = xk::skylanderDB::getCharacterId(card_data);
+		uint16_t variantId = xk::skylanderDB::getVariantId(card_data);
 		const xk::SkylanderInfo* info = xk::skylanderDB::getInfo(charId);
+
+		std::cout << "Figure Info:" << std::endl;
 		if (info)
 		{
-			std::cout << "Skylander: " << info->name << " (" << xk::skylanderDB::getTypeString(info->type) << ", " << xk::skylanderDB::getElementString(info->element) << ")" << std::endl;
+			std::cout << "\tName:    " << info->name << std::endl;
+			std::cout << "\tType:    " << xk::skylanderDB::getTypeString(info->type) << std::endl;
+			std::cout << "\tElement: " << xk::skylanderDB::getElementString(info->element) << std::endl;
+			std::cout << "\tGame:    " << xk::skylanderDB::getGameString(info->game) << std::endl;
+			std::cout << "\tChar ID: " << charId << " (0x" << std::hex << charId << std::dec << ")" << std::endl;
+			std::cout << "\tVariant: " << variantId << " (0x" << std::hex << variantId << std::dec << ")" << std::endl;
+
+			// Special notes for certain types
+			if (info->type == xk::SKY_TYPE_TRAP)
+			{
+				std::cout << "\tNote:    Trap - villain data stored in variant ID" << std::endl;
+			}
+			else if (info->type == xk::SKY_TYPE_CREATION_CRYSTAL)
+			{
+				std::cout << "\tNote:    Creation Crystal - Imaginator data stored on figure" << std::endl;
+			}
 		}
 		else
 		{
-			std::cout << "Skylander: Unknown (ID: 0x" << std::hex << charId << std::dec << ")" << std::endl;
+			std::cout << "\tName:    Unknown" << std::endl;
+			std::cout << "\tChar ID: " << charId << " (0x" << std::hex << charId << std::dec << ")" << std::endl;
+			std::cout << "\tVariant: " << variantId << " (0x" << std::hex << variantId << std::dec << ")" << std::endl;
 		}
 
 		// Generate filename if not provided

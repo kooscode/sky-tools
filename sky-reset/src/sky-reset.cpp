@@ -282,14 +282,35 @@ int main(int argc, char** argv)
 
     // Identify Skylander (character ID is not encrypted)
     uint16_t charId = skylanderDB::getCharacterId(data);
+    uint16_t variantId = skylanderDB::getVariantId(data);
     const SkylanderInfo* info = skylanderDB::getInfo(charId);
+
+    std::cout << "Figure Info:" << std::endl;
     if (info)
     {
-        std::cout << "\tSkylander: " << info->name << " (" << skylanderDB::getTypeString(info->type) << ", " << skylanderDB::getElementString(info->element) << ")" << std::endl;
+        std::cout << "\tName:    " << info->name << std::endl;
+        std::cout << "\tType:    " << skylanderDB::getTypeString(info->type) << std::endl;
+        std::cout << "\tElement: " << skylanderDB::getElementString(info->element) << std::endl;
+        std::cout << "\tGame:    " << skylanderDB::getGameString(info->game) << std::endl;
+        std::cout << "\tChar ID: " << charId << " (0x" << std::hex << charId << std::dec << ")" << std::endl;
+        std::cout << "\tVariant: " << variantId << " (0x" << std::hex << variantId << std::dec << ")" << std::endl;
+
+        // Warnings for special types
+        if (info->type == SKY_TYPE_TRAP)
+        {
+            std::cout << "\t** NOTE: This is a Trap - reset will clear captured villain data" << std::endl;
+        }
+        else if (info->type == SKY_TYPE_CREATION_CRYSTAL)
+        {
+            std::cout << "\t** NOTE: This is a Creation Crystal - reset may not fully clear Imaginator data" << std::endl;
+            std::cout << "\t         Use an older Skylanders game to fully reset if needed" << std::endl;
+        }
     }
     else
     {
-        std::cout << "\tSkylander: Unknown (ID: 0x" << std::hex << charId << std::dec << ")" << std::endl;
+        std::cout << "\tName:    Unknown" << std::endl;
+        std::cout << "\tChar ID: " << charId << " (0x" << std::hex << charId << std::dec << ")" << std::endl;
+        std::cout << "\tVariant: " << variantId << " (0x" << std::hex << variantId << std::dec << ")" << std::endl;
     }
 
     // Decrypt the data

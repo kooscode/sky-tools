@@ -162,19 +162,38 @@ int main(int argc, char** argv)
 	//Extract Skylander File UID
 	uint8_t file_uid[4];
 	mempcpy(file_uid, sky_file[0].blk0, NFC_UID_SIZE);
-	std::cout << "\tSkylander File UID : [UID=" << xk::skylanderNFC::toHexStr(file_uid,  NFC_UID_SIZE) << "]" << std::endl;
+	std::cout << "\tFile UID: " << xk::skylanderNFC::toHexStr(file_uid, NFC_UID_SIZE) << std::endl;
 
 	// Identify Skylander from file
 	uint8_t* file_data = reinterpret_cast<uint8_t*>(sky_file);
 	uint16_t charId = xk::skylanderDB::getCharacterId(file_data);
+	uint16_t variantId = xk::skylanderDB::getVariantId(file_data);
 	const xk::SkylanderInfo* info = xk::skylanderDB::getInfo(charId);
+
+	std::cout << "Figure Info:" << std::endl;
 	if (info)
 	{
-		std::cout << "\tSkylander: " << info->name << " (" << xk::skylanderDB::getTypeString(info->type) << ", " << xk::skylanderDB::getElementString(info->element) << ")" << std::endl;
+		std::cout << "\tName:    " << info->name << std::endl;
+		std::cout << "\tType:    " << xk::skylanderDB::getTypeString(info->type) << std::endl;
+		std::cout << "\tElement: " << xk::skylanderDB::getElementString(info->element) << std::endl;
+		std::cout << "\tGame:    " << xk::skylanderDB::getGameString(info->game) << std::endl;
+		std::cout << "\tChar ID: " << charId << " (0x" << std::hex << charId << std::dec << ")" << std::endl;
+		std::cout << "\tVariant: " << variantId << " (0x" << std::hex << variantId << std::dec << ")" << std::endl;
+
+		if (info->type == xk::SKY_TYPE_TRAP)
+		{
+			std::cout << "\tNote:    Trap with captured villain data" << std::endl;
+		}
+		else if (info->type == xk::SKY_TYPE_CREATION_CRYSTAL)
+		{
+			std::cout << "\tNote:    Creation Crystal with Imaginator data" << std::endl;
+		}
 	}
 	else
 	{
-		std::cout << "\tSkylander: Unknown (ID: 0x" << std::hex << charId << std::dec << ")" << std::endl;
+		std::cout << "\tName:    Unknown" << std::endl;
+		std::cout << "\tChar ID: " << charId << " (0x" << std::hex << charId << std::dec << ")" << std::endl;
+		std::cout << "\tVariant: " << variantId << " (0x" << std::hex << variantId << std::dec << ")" << std::endl;
 	}
 
 	std::cout << "STEP 2:\tConnecting to ACR122U NFC Reader" << std::endl;

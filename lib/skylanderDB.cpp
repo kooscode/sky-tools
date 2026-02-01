@@ -78,6 +78,17 @@ namespace xk
         { 207, "Sparx the Dragonfly", SKY_TYPE_ITEM, SKY_ELEMENT_NONE, SKY_GAME_SPYROS_ADVENTURE },
         { 208, "Dragonfire Cannon", SKY_TYPE_ITEM, SKY_ELEMENT_NONE, SKY_GAME_GIANTS },
         { 209, "Scorpion Striker Catapult", SKY_TYPE_ITEM, SKY_ELEMENT_NONE, SKY_GAME_GIANTS },
+        // ==================== Element Traps ====================
+        { 210, "Magic Trap", SKY_TYPE_TRAP, SKY_ELEMENT_MAGIC, SKY_GAME_TRAP_TEAM },
+        { 211, "Water Trap", SKY_TYPE_TRAP, SKY_ELEMENT_WATER, SKY_GAME_TRAP_TEAM },
+        { 212, "Air Trap", SKY_TYPE_TRAP, SKY_ELEMENT_AIR, SKY_GAME_TRAP_TEAM },
+        { 213, "Undead Trap", SKY_TYPE_TRAP, SKY_ELEMENT_UNDEAD, SKY_GAME_TRAP_TEAM },
+        { 214, "Tech Trap", SKY_TYPE_TRAP, SKY_ELEMENT_TECH, SKY_GAME_TRAP_TEAM },
+        { 215, "Fire Trap", SKY_TYPE_TRAP, SKY_ELEMENT_FIRE, SKY_GAME_TRAP_TEAM },
+        { 216, "Earth Trap", SKY_TYPE_TRAP, SKY_ELEMENT_EARTH, SKY_GAME_TRAP_TEAM },
+        { 217, "Life Trap", SKY_TYPE_TRAP, SKY_ELEMENT_LIFE, SKY_GAME_TRAP_TEAM },
+        { 218, "Dark Trap", SKY_TYPE_TRAP, SKY_ELEMENT_DARK, SKY_GAME_TRAP_TEAM },
+        { 219, "Light Trap", SKY_TYPE_TRAP, SKY_ELEMENT_LIGHT, SKY_GAME_TRAP_TEAM },
         { 220, "Kaos Trap", SKY_TYPE_TRAP, SKY_ELEMENT_KAOS, SKY_GAME_TRAP_TEAM },
         { 230, "Hand of Fate", SKY_TYPE_ITEM, SKY_ELEMENT_NONE, SKY_GAME_TRAP_TEAM },
         { 231, "Piggy Bank", SKY_TYPE_ITEM, SKY_ELEMENT_NONE, SKY_GAME_TRAP_TEAM },
@@ -159,6 +170,7 @@ namespace xk
         { 541, "Thumpling", SKY_TYPE_MINI, SKY_ELEMENT_WATER, SKY_GAME_TRAP_TEAM },
         { 542, "Mini-Jini", SKY_TYPE_MINI, SKY_ELEMENT_MAGIC, SKY_GAME_TRAP_TEAM },
         { 543, "Eye-Small", SKY_TYPE_MINI, SKY_ELEMENT_UNDEAD, SKY_GAME_TRAP_TEAM },
+        { 514, "Gill Runt", SKY_TYPE_MINI, SKY_ELEMENT_WATER, SKY_GAME_TRAP_TEAM },
 
         // ==================== Imaginators Senseis (2016) ====================
         { 601, "King Pen", SKY_TYPE_IMAGINATOR, SKY_ELEMENT_WATER, SKY_GAME_IMAGINATORS },
@@ -293,7 +305,8 @@ namespace xk
         // ==================== Adventure Packs (SWAP Force) ====================
         { 3300, "Sheep Wreck Island", SKY_TYPE_ITEM, SKY_ELEMENT_NONE, SKY_GAME_SWAP_FORCE },
         { 3301, "Tower of Time", SKY_TYPE_ITEM, SKY_ELEMENT_NONE, SKY_GAME_SWAP_FORCE },
-        { 3302, "Arkeyan Crossbow", SKY_TYPE_ITEM, SKY_ELEMENT_NONE, SKY_GAME_SWAP_FORCE },
+        { 3302, "Fiery Forge", SKY_TYPE_ITEM, SKY_ELEMENT_NONE, SKY_GAME_SWAP_FORCE },
+        { 3303, "Arkeyan Crossbow", SKY_TYPE_ITEM, SKY_ELEMENT_NONE, SKY_GAME_SWAP_FORCE },
 
         // ==================== SuperChargers - Drivers ====================
         { 3400, "Fiesta", SKY_TYPE_SUPERCHARGER, SKY_ELEMENT_UNDEAD, SKY_GAME_SUPERCHARGERS },
@@ -331,6 +344,12 @@ namespace xk
         { 3501, "Land Trophy", SKY_TYPE_ITEM, SKY_ELEMENT_NONE, SKY_GAME_SUPERCHARGERS },
         { 3502, "Sea Trophy", SKY_TYPE_ITEM, SKY_ELEMENT_NONE, SKY_GAME_SUPERCHARGERS },
         { 3503, "Kaos Trophy", SKY_TYPE_ITEM, SKY_ELEMENT_NONE, SKY_GAME_SUPERCHARGERS },
+
+        // ==================== Debug/Templates ====================
+        { 999, "Debug Minion", SKY_TYPE_ITEM, SKY_ELEMENT_NONE, SKY_GAME_SPYROS_ADVENTURE },
+        { 1999, "Template Bottom", SKY_TYPE_ITEM, SKY_ELEMENT_NONE, SKY_GAME_SWAP_FORCE },
+        { 2999, "Template Top", SKY_TYPE_ITEM, SKY_ELEMENT_NONE, SKY_GAME_SWAP_FORCE },
+        { 3999, "Template Legacy", SKY_TYPE_ITEM, SKY_ELEMENT_NONE, SKY_GAME_SUPERCHARGERS },
 
         // End marker
         { 0xFFFF, nullptr, SKY_TYPE_UNKNOWN, SKY_ELEMENT_NONE, SKY_GAME_UNKNOWN }
@@ -434,7 +453,7 @@ namespace xk
 
     bool skylanderDB::isTrap(uint16_t characterId)
     {
-        return characterId == 220; // Kaos Trap (element traps use different system)
+        return (characterId >= 210 && characterId <= 220); // Element traps 210-219, Kaos trap 220
     }
 
     bool skylanderDB::isVehicle(uint16_t characterId)
