@@ -37,11 +37,20 @@ namespace xk
 
     acr122u::~acr122u()
     {
-        if (applicationContext_ != 0x00)
-            releaseContext();
+        // Destructor must not throw - silently handle cleanup errors
+        try
+        {
+            if (connectionHandler_ != 0x00)
+                deviceDisconnect();
+        }
+        catch (...) { /* ignore */ }
 
-        if (connectionHandler_ != 0x00)
-            deviceDisconnect();
+        try
+        {
+            if (applicationContext_ != 0x00)
+                releaseContext();
+        }
+        catch (...) { /* ignore */ }
     }
 
     void acr122u::establishContext() 
