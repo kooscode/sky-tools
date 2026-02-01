@@ -22,9 +22,6 @@ INCLUDES = -I/usr/include/PCSC -I$(LIB_DIR)
 # Libraries
 LIBS = -lpcsclite
 
-# Defines
-DEFS = -DUSER_NAME=\"$(USER)\"
-
 # Library source files
 LIB_SOURCES = $(wildcard $(LIB_DIR)/*.cpp)
 LIB_OBJECTS = $(patsubst $(LIB_DIR)/%.cpp,$(OBJ_DIR)/%.o,$(LIB_SOURCES))
