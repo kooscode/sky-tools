@@ -12,8 +12,11 @@
 #include <filesystem>
 #include <iomanip>
 #include <sstream>
+#include <algorithm>
+#include <cctype>
 
 #include "skylanderDB.hpp"
+#include "hatDB.hpp"
 #include "acr122u.hpp"
 #include "skylanderNFC.hpp"
 #include "appError.hpp"
@@ -31,6 +34,109 @@ std::string toHexStr(const uint8_t* data, size_t len)
         ss << std::hex << std::uppercase << std::setw(2) << std::setfill('0') << (int)data[i];
     }
     return ss.str();
+}
+
+// List all Skylanders in the database
+void listSkylanders(const std::string& filter = "")
+{
+    const xk::SkylanderInfo* db = xk::skylanderDB::getDatabase();
+    size_t count = xk::skylanderDB::getDatabaseSize();
+
+    std::string lowerFilter = filter;
+    std::transform(lowerFilter.begin(), lowerFilter.end(), lowerFilter.begin(),
+        [](unsigned char c) { return std::tolower(c); });
+
+    std::cout << "=== Skylander Database ===" << std::endl;
+    std::cout << std::left << std::setw(6) << "ID"
+              << std::setw(30) << "Name"
+              << std::setw(18) << "Type"
+              << std::setw(10) << "Element"
+              << "Game" << std::endl;
+    std::cout << std::string(90, '-') << std::endl;
+
+    int displayed = 0;
+    for (size_t i = 0; i < count; i++)
+    {
+        if (db[i].name == nullptr) continue;
+
+        // Apply filter if specified
+        if (!lowerFilter.empty())
+        {
+            std::string name = db[i].name;
+            std::transform(name.begin(), name.end(), name.begin(),
+                [](unsigned char c) { return std::tolower(c); });
+            std::string type = xk::skylanderDB::getTypeString(db[i].type);
+            std::transform(type.begin(), type.end(), type.begin(),
+                [](unsigned char c) { return std::tolower(c); });
+            std::string element = xk::skylanderDB::getElementString(db[i].element);
+            std::transform(element.begin(), element.end(), element.begin(),
+                [](unsigned char c) { return std::tolower(c); });
+            std::string game = xk::skylanderDB::getGameString(db[i].game);
+            std::transform(game.begin(), game.end(), game.begin(),
+                [](unsigned char c) { return std::tolower(c); });
+
+            if (name.find(lowerFilter) == std::string::npos &&
+                type.find(lowerFilter) == std::string::npos &&
+                element.find(lowerFilter) == std::string::npos &&
+                game.find(lowerFilter) == std::string::npos)
+            {
+                continue;
+            }
+        }
+
+        std::cout << std::left << std::setw(6) << db[i].id
+                  << std::setw(30) << db[i].name
+                  << std::setw(18) << xk::skylanderDB::getTypeString(db[i].type)
+                  << std::setw(10) << xk::skylanderDB::getElementString(db[i].element)
+                  << xk::skylanderDB::getGameString(db[i].game) << std::endl;
+        displayed++;
+    }
+
+    std::cout << std::string(90, '-') << std::endl;
+    std::cout << "Total: " << displayed << " Skylanders";
+    if (!filter.empty())
+        std::cout << " (filtered from " << count << ")";
+    std::cout << std::endl;
+}
+
+// List all hats in the database
+void listHats(const std::string& filter = "")
+{
+    const xk::HatInfo* hats = xk::hatDB::getHatList();
+    size_t count = xk::hatDB::getHatCount();
+
+    std::string lowerFilter = filter;
+    std::transform(lowerFilter.begin(), lowerFilter.end(), lowerFilter.begin(),
+        [](unsigned char c) { return std::tolower(c); });
+
+    std::cout << "=== Hat Database ===" << std::endl;
+    std::cout << std::left << std::setw(6) << "ID" << "Name" << std::endl;
+    std::cout << std::string(50, '-') << std::endl;
+
+    int displayed = 0;
+    for (size_t i = 0; i < count; i++)
+    {
+        if (hats[i].name == nullptr) continue;
+
+        // Apply filter if specified
+        if (!lowerFilter.empty())
+        {
+            std::string name = hats[i].name;
+            std::transform(name.begin(), name.end(), name.begin(),
+                [](unsigned char c) { return std::tolower(c); });
+            if (name.find(lowerFilter) == std::string::npos)
+                continue;
+        }
+
+        std::cout << std::left << std::setw(6) << hats[i].id << hats[i].name << std::endl;
+        displayed++;
+    }
+
+    std::cout << std::string(50, '-') << std::endl;
+    std::cout << "Total: " << displayed << " hats";
+    if (!filter.empty())
+        std::cout << " (filtered from " << count << ")";
+    std::cout << std::endl;
 }
 
 // Display Skylander info from raw data
@@ -193,8 +299,11 @@ bool identifyFromReader()
 int main(int argc, char** argv)
 {
     bool hasFiles = false;
+    bool doListSkylanders = false;
+    bool doListHats = false;
+    std::string listFilter;
 
-    // Check for verbose flag and count file arguments
+    // Check for flags and count file arguments
     for (int i = 1; i < argc; i++)
     {
         std::string arg = argv[i];
@@ -202,23 +311,62 @@ int main(int argc, char** argv)
         {
             g_verbose = true;
         }
+        else if (arg == "-l" || arg == "--list-skylanders")
+        {
+            doListSkylanders = true;
+        }
+        else if (arg == "-L" || arg == "--list-hats")
+        {
+            doListHats = true;
+        }
+        else if (arg == "-f" || arg == "--filter")
+        {
+            if (i + 1 < argc)
+            {
+                listFilter = argv[++i];
+            }
+        }
         else if (arg == "-h" || arg == "--help")
         {
-            std::cout << "Usage: sky-identify [-v] [file_or_directory ...]" << std::endl;
+            std::cout << "Usage: sky-identify [options] [file_or_directory ...]" << std::endl;
             std::cout << "Identifies Skylanders from NFC reader or dump files" << std::endl;
             std::cout << std::endl;
             std::cout << "Options:" << std::endl;
-            std::cout << "  -v    Verbose output (detailed info)" << std::endl;
-            std::cout << "  -h    Show this help" << std::endl;
+            std::cout << "  -v, --verbose          Verbose output (detailed info)" << std::endl;
+            std::cout << "  -l, --list-skylanders  List all Skylanders in database" << std::endl;
+            std::cout << "  -L, --list-hats        List all hats in database" << std::endl;
+            std::cout << "  -f, --filter TERM      Filter list by name/type/element/game" << std::endl;
+            std::cout << "  -h, --help             Show this help" << std::endl;
             std::cout << std::endl;
             std::cout << "If no files specified, reads from NFC reader." << std::endl;
             std::cout << "Supports .bin, .dump, .dmp files and directories." << std::endl;
+            std::cout << std::endl;
+            std::cout << "Examples:" << std::endl;
+            std::cout << "  sky-identify                    Read from NFC reader" << std::endl;
+            std::cout << "  sky-identify -l                 List all Skylanders" << std::endl;
+            std::cout << "  sky-identify -l -f fire         List fire element Skylanders" << std::endl;
+            std::cout << "  sky-identify -L                 List all hats" << std::endl;
+            std::cout << "  sky-identify dump.bin           Identify from dump file" << std::endl;
+            std::cout << "  sky-identify ./dumps/           Identify all dumps in directory" << std::endl;
             return 0;
         }
         else
         {
             hasFiles = true;
         }
+    }
+
+    // Handle list options
+    if (doListSkylanders)
+    {
+        listSkylanders(listFilter);
+        return 0;
+    }
+
+    if (doListHats)
+    {
+        listHats(listFilter);
+        return 0;
     }
 
     // If no file arguments, read from NFC reader
@@ -232,8 +380,16 @@ int main(int argc, char** argv)
     {
         std::string arg = argv[i];
 
-        if (arg == "-v" || arg == "--verbose")
+        if (arg == "-v" || arg == "--verbose" ||
+            arg == "-l" || arg == "--list-skylanders" ||
+            arg == "-L" || arg == "--list-hats")
         {
+            continue;
+        }
+
+        if (arg == "-f" || arg == "--filter")
+        {
+            i++; // Skip filter value
             continue;
         }
 
