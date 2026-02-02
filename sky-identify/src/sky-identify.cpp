@@ -16,6 +16,7 @@
 #include <cctype>
 
 #include "skylanderDB.hpp"
+#include "skylanderCrypto.hpp"
 #include "hatDB.hpp"
 #include "acr122u.hpp"
 #include "skylanderNFC.hpp"
@@ -139,10 +140,97 @@ void listHats(const std::string& filter = "")
     std::cout << std::endl;
 }
 
-// Display Skylander info from raw data
-void displayInfo(const uint8_t* data, const std::string& source)
+// Data area field offsets (relative to area start block)
+#define DATA_XP_OFFSET      0x00
+#define DATA_MONEY_OFFSET   0x03
+#define DATA_PLAYTIME_OFFSET 0x05
+#define DATA_SEQUENCE_OFFSET 0x09
+
+// Block 1 offsets (skills/hat block = area + 0x10)
+#define DATA_SKILLS_OFFSET  0x10
+#define DATA_PLATFORM_OFFSET 0x12
+#define DATA_HAT_OFFSET     0x13
+
+// Name offsets (area + 0x20 for part 1, area + 0x40 for part 2)
+#define DATA_NAME1_OFFSET   0x20
+#define DATA_NAME2_OFFSET   0x40
+
+// Hero data (area + 0x50)
+#define DATA_HERO_CHALLENGES_OFFSET 0x50
+#define DATA_HERO_POINTS_OFFSET 0x56
+
+// Extract 24-bit little-endian value
+uint32_t read24LE(const uint8_t* data)
 {
-    // Get character info
+    return data[0] | (data[1] << 8) | (data[2] << 16);
+}
+
+// Extract 16-bit little-endian value
+uint16_t read16LE(const uint8_t* data)
+{
+    return data[0] | (data[1] << 8);
+}
+
+// Extract 32-bit little-endian value
+uint32_t read32LE(const uint8_t* data)
+{
+    return data[0] | (data[1] << 8) | (data[2] << 16) | (data[3] << 24);
+}
+
+// Convert UTF-16LE to ASCII string
+std::string utf16ToAscii(const uint8_t* data, size_t maxChars)
+{
+    std::string result;
+    for (size_t i = 0; i < maxChars; i++)
+    {
+        uint16_t ch = data[i * 2] | (data[i * 2 + 1] << 8);
+        if (ch == 0) break;
+        if (ch < 128)
+            result += static_cast<char>(ch);
+        else
+            result += '?'; // Non-ASCII
+    }
+    return result;
+}
+
+// Format playtime as hours:minutes:seconds
+std::string formatPlaytime(uint32_t seconds)
+{
+    uint32_t hours = seconds / 3600;
+    uint32_t minutes = (seconds % 3600) / 60;
+    uint32_t secs = seconds % 60;
+
+    std::stringstream ss;
+    ss << hours << "h " << minutes << "m " << secs << "s";
+    return ss.str();
+}
+
+// Get platform name from ID
+const char* getPlatformName(uint8_t platformId)
+{
+    switch (platformId)
+    {
+        case 0x00: return "None";
+        case 0x01: return "Wii";
+        case 0x02: return "Xbox 360";
+        case 0x03: return "PlayStation 3";
+        case 0x04: return "PC";
+        case 0x05: return "3DS";
+        case 0x06: return "Wii U";
+        case 0x07: return "Xbox One";
+        case 0x08: return "PlayStation 4";
+        default:   return "Unknown";
+    }
+}
+
+// Display full Skylander info from raw data (decrypted)
+void displayInfo(const uint8_t* rawData, const std::string& source, bool fullDump)
+{
+    // Make a copy for decryption
+    uint8_t data[1024];
+    memcpy(data, rawData, 1024);
+
+    // Get character info from sector 0 (not encrypted)
     uint16_t charId = xk::skylanderDB::getCharacterId(data);
     uint16_t variantId = xk::skylanderDB::getVariantId(data);
     const xk::SkylanderInfo* info = xk::skylanderDB::getInfo(charId);
@@ -150,36 +238,118 @@ void displayInfo(const uint8_t* data, const std::string& source)
     // Extract UID (first 4 bytes)
     std::string uid = toHexStr(data, 4);
 
-    if (g_verbose)
+    // Decrypt the data to read stats
+    xk::skylanderCrypto::decryptSkylander(data);
+
+    // Determine active data area
+    uint8_t activeArea = xk::skylanderCrypto::getActiveArea(data);
+    size_t areaOffset = activeArea * 16; // Convert block to byte offset
+
+    // Read data from active area
+    uint32_t xp = read24LE(data + areaOffset + DATA_XP_OFFSET);
+    uint16_t money = read16LE(data + areaOffset + DATA_MONEY_OFFSET);
+    uint32_t playtime = read32LE(data + areaOffset + DATA_PLAYTIME_OFFSET);
+    uint8_t sequence = data[areaOffset + DATA_SEQUENCE_OFFSET];
+
+    // Skills/Hat block
+    uint16_t skills = read16LE(data + areaOffset + DATA_SKILLS_OFFSET);
+    uint8_t platform = data[areaOffset + DATA_PLATFORM_OFFSET];
+    uint16_t hatId = read16LE(data + areaOffset + DATA_HAT_OFFSET);
+
+    // Custom name (16 chars max, UTF-16LE) - only for regular playable figures
+    std::string customName;
+    if (!xk::skylanderDB::isTrap(charId) &&
+        !xk::skylanderDB::isCreationCrystal(charId) &&
+        !xk::skylanderDB::isVehicle(charId) &&
+        !(info && info->type == xk::SKY_TYPE_ITEM))
     {
-        // Verbose output
+        customName = utf16ToAscii(data + areaOffset + DATA_NAME1_OFFSET, 8);
+        customName += utf16ToAscii(data + areaOffset + DATA_NAME2_OFFSET, 8);
+    }
+
+    // Hero data
+    uint32_t heroChallenges = read32LE(data + areaOffset + DATA_HERO_CHALLENGES_OFFSET);
+    uint8_t heroPoints = data[areaOffset + DATA_HERO_POINTS_OFFSET];
+
+    // Get hat name
+    const char* hatName = xk::hatDB::getHatName(hatId);
+
+    // Check if this is a special type (trap, crystal, vehicle)
+    bool isTrap = xk::skylanderDB::isTrap(charId);
+    bool isCrystal = xk::skylanderDB::isCreationCrystal(charId);
+    bool isVehicle = xk::skylanderDB::isVehicle(charId);
+    bool isItem = (info && info->type == xk::SKY_TYPE_ITEM);
+
+    if (g_verbose || fullDump)
+    {
+        // Detailed output
+        std::cout << "=== Skylander Information ===" << std::endl;
         if (!source.empty())
-            std::cout << "Source: " << source << std::endl;
-        std::cout << "  UID:     " << uid << std::endl;
+            std::cout << "Source:          " << source << std::endl;
+        std::cout << std::endl;
+
+        std::cout << "-- Identity --" << std::endl;
+        std::cout << "UID:             " << uid << std::endl;
+        std::cout << "Character ID:    " << charId << " (0x" << std::hex << charId << std::dec << ")" << std::endl;
+        std::cout << "Variant ID:      " << variantId << " (0x" << std::hex << variantId << std::dec << ")" << std::endl;
+
         if (info)
         {
-            std::cout << "  Name:    " << info->name << std::endl;
-            std::cout << "  Type:    " << xk::skylanderDB::getTypeString(info->type) << std::endl;
-            std::cout << "  Element: " << xk::skylanderDB::getElementString(info->element) << std::endl;
-            std::cout << "  Game:    " << xk::skylanderDB::getGameString(info->game) << std::endl;
-            std::cout << "  Char ID: " << charId << " (0x" << std::hex << charId << std::dec << ")" << std::endl;
-            std::cout << "  Variant: " << variantId << " (0x" << std::hex << variantId << std::dec << ")" << std::endl;
-
-            if (info->type == xk::SKY_TYPE_TRAP)
-            {
-                std::cout << "  Note:    Trap - villain data encoded in variant ID" << std::endl;
-            }
-            else if (info->type == xk::SKY_TYPE_CREATION_CRYSTAL)
-            {
-                std::cout << "  Note:    Creation Crystal - stores Imaginator character data" << std::endl;
-            }
+            std::cout << "Name:            " << info->name << std::endl;
+            std::cout << "Type:            " << xk::skylanderDB::getTypeString(info->type) << std::endl;
+            std::cout << "Element:         " << xk::skylanderDB::getElementString(info->element) << std::endl;
+            std::cout << "Game:            " << xk::skylanderDB::getGameString(info->game) << std::endl;
         }
         else
         {
-            std::cout << "  Name:    UNKNOWN" << std::endl;
-            std::cout << "  Char ID: " << charId << " (0x" << std::hex << charId << std::dec << ")" << std::endl;
-            std::cout << "  Variant: " << variantId << " (0x" << std::hex << variantId << std::dec << ")" << std::endl;
+            std::cout << "Name:            UNKNOWN" << std::endl;
         }
+
+        // Stats only for playable figures (not traps, crystals, items, vehicles)
+        if (!isTrap && !isCrystal && !isItem && !isVehicle)
+        {
+            std::cout << std::endl;
+            std::cout << "-- Stats --" << std::endl;
+            std::cout << "XP:              " << xp << std::endl;
+            std::cout << "Money:           " << money << std::endl;
+            std::cout << "Hero Points:     " << (int)heroPoints << std::endl;
+            std::cout << "Playtime:        " << formatPlaytime(playtime) << " (" << playtime << "s)" << std::endl;
+
+            std::cout << std::endl;
+            std::cout << "-- Equipment --" << std::endl;
+            std::cout << "Hat:             ";
+            if (hatId == 0)
+                std::cout << "None" << std::endl;
+            else
+                std::cout << hatName << " (ID: " << hatId << ")" << std::endl;
+
+            if (!customName.empty())
+                std::cout << "Custom Name:     " << customName << std::endl;
+
+            std::cout << std::endl;
+            std::cout << "-- Progress --" << std::endl;
+            std::cout << "Skill Upgrades:  0x" << std::hex << std::setw(4) << std::setfill('0') << skills << std::dec << std::endl;
+            std::cout << "Hero Challenges: 0x" << std::hex << std::setw(8) << std::setfill('0') << heroChallenges << std::dec << std::endl;
+            std::cout << "Last Platform:   " << getPlatformName(platform) << std::endl;
+        }
+        else if (isTrap)
+        {
+            std::cout << std::endl;
+            std::cout << "-- Trap Data --" << std::endl;
+            std::cout << "Note: Villain data is stored in variant ID" << std::endl;
+        }
+        else if (isCrystal)
+        {
+            std::cout << std::endl;
+            std::cout << "-- Creation Crystal --" << std::endl;
+            std::cout << "Note: Imaginator data is stored in encrypted format" << std::endl;
+        }
+
+        std::cout << std::endl;
+        std::cout << "-- Internal --" << std::endl;
+        std::cout << "Active Area:     " << (activeArea == 0x08 ? "0 (block 0x08)" : "1 (block 0x24)") << std::endl;
+        std::cout << "Sequence:        " << (int)sequence << std::endl;
+
         std::cout << std::endl;
     }
     else
@@ -187,13 +357,23 @@ void displayInfo(const uint8_t* data, const std::string& source)
         // Compact output
         if (info)
         {
-            std::cout << info->name << " | "
-                      << xk::skylanderDB::getTypeString(info->type) << " | "
-                      << xk::skylanderDB::getElementString(info->element) << " | "
-                      << xk::skylanderDB::getGameString(info->game) << " | "
-                      << "ID:" << charId << " | "
-                      << "Var:" << variantId << " | "
-                      << "UID:" << uid;
+            std::cout << info->name;
+            if (!customName.empty())
+                std::cout << " \"" << customName << "\"";
+            std::cout << " | " << xk::skylanderDB::getTypeString(info->type)
+                      << " | " << xk::skylanderDB::getElementString(info->element)
+                      << " | " << xk::skylanderDB::getGameString(info->game);
+
+            if (!isTrap && !isCrystal && !isItem && !isVehicle)
+            {
+                std::cout << " | XP:" << xp
+                          << " | $:" << money
+                          << " | HP:" << (int)heroPoints;
+                if (hatId > 0)
+                    std::cout << " | Hat:" << hatName;
+            }
+
+            std::cout << " | UID:" << uid;
             if (!source.empty())
                 std::cout << " | " << source;
             std::cout << std::endl;
@@ -235,14 +415,15 @@ void identifyFile(const std::string& filepath)
 
     // Display info
     std::string filename = fs::path(filepath).filename().string();
-    displayInfo(data, g_verbose ? filepath : filename);
+    displayInfo(data, g_verbose ? filepath : filename, false);
 }
 
 bool identifyFromReader()
 {
     const uint8_t SKYKEY[] = SKYLANDER_BLOCK_0_KEY_A;
     const uint8_t DEFAULTKEY[] = NFC_DEFAULT_KEY_A;
-    xk::acr122u::NFC_Sector sector0;
+    uint8_t data[1024] = {0};
+    xk::acr122u::NFC_Sector sector;
 
     try
     {
@@ -253,15 +434,15 @@ bool identifyFromReader()
         std::cout << "Found: " << reader_name << std::endl;
         std::cout << "Place Skylander on reader..." << std::endl;
 
-        // Try Skylander key first
-        memcpy(sector0.key_A, SKYKEY, NFC_KEY_SIZE);
-        uint32_t retval = nfc.sectorAuthKeyA(0, sector0.key_A);
+        // Read sector 0 first (uses fixed Skylander key)
+        memcpy(sector.key_A, SKYKEY, NFC_KEY_SIZE);
+        uint32_t retval = nfc.sectorAuthKeyA(0, sector.key_A);
 
         // If Skylander key fails, try default key
         if (retval == NFC_ERROR_KEYA_AUTH)
         {
-            memcpy(sector0.key_A, DEFAULTKEY, NFC_KEY_SIZE);
-            retval = nfc.sectorAuthKeyA(0, sector0.key_A);
+            memcpy(sector.key_A, DEFAULTKEY, NFC_KEY_SIZE);
+            retval = nfc.sectorAuthKeyA(0, sector.key_A);
         }
 
         if (retval != NFC_OK)
@@ -271,19 +452,45 @@ bool identifyFromReader()
         }
 
         // Read sector 0
-        retval = nfc.sectorRead(0, sector0);
+        retval = nfc.sectorRead(0, sector);
         if (retval != NFC_OK)
         {
-            std::cout << "ERROR: Could not read card data" << std::endl;
+            std::cout << "ERROR: Could not read sector 0" << std::endl;
             return false;
+        }
+        memcpy(data, &sector, sizeof(sector));
+
+        std::cout << "Reading full card..." << std::endl;
+
+        // Read remaining sectors (1-15) using generated keys
+        for (int s = 1; s < 16; s++)
+        {
+            // Generate sector key from UID (first 4 bytes)
+            uint64_t sectorKey = xk::skylanderNFC::makeSkyKey(s, data);
+            memcpy(sector.key_A, &sectorKey, NFC_KEY_SIZE);
+
+            retval = nfc.sectorAuthKeyA(s, sector.key_A);
+            if (retval != NFC_OK)
+            {
+                std::cout << "Warning: Could not auth sector " << s << std::endl;
+                continue;
+            }
+
+            retval = nfc.sectorRead(s, sector);
+            if (retval != NFC_OK)
+            {
+                std::cout << "Warning: Could not read sector " << s << std::endl;
+                continue;
+            }
+
+            // Copy sector data (4 blocks * 16 bytes = 64 bytes per sector)
+            memcpy(data + s * 64, &sector, sizeof(sector));
         }
 
         std::cout << std::endl;
 
-        // Display info from sector 0 data
-        uint8_t data[1024] = {0};
-        memcpy(data, &sector0, sizeof(sector0));
-        displayInfo(data, "NFC Reader");
+        // Display full info
+        displayInfo(data, "NFC Reader", true);
 
         nfc.deviceDisconnect();
         return true;
