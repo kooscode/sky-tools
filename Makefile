@@ -66,13 +66,13 @@ sky-reset: $(OUT_DIR) $(LIB_OBJECTS)
 		-o $(OUT_DIR)/sky-reset \
 		$(INCLUDES) $(LIBS)
 
-# Build sky-identify (no NFC reader required - just reads dump files)
-sky-identify: $(OUT_DIR) $(OBJ_DIR)/skylanderDB.o
+# Build sky-identify (reads from NFC reader or dump files)
+sky-identify: $(OUT_DIR) $(LIB_OBJECTS)
 	$(CXX) $(CFLAGS) -std=$(CPP_STD) $(DEFS) \
 		sky-identify/src/sky-identify.cpp \
-		$(OBJ_DIR)/skylanderDB.o \
+		$(LIB_OBJECTS) \
 		-o $(OUT_DIR)/sky-identify \
-		-I$(LIB_DIR)
+		$(INCLUDES) $(LIBS)
 
 # Build sky-make (create new Skylander dump files - no NFC reader required)
 sky-make: $(OUT_DIR) $(OBJ_DIR)/skylanderDB.o $(OBJ_DIR)/skylanderCrypto.o $(OBJ_DIR)/hatDB.o
