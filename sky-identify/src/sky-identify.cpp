@@ -14,6 +14,7 @@
 #include <sstream>
 #include <algorithm>
 #include <cctype>
+#include <vector>
 
 #include "skylanderDB.hpp"
 #include "skylanderCrypto.hpp"
@@ -37,7 +38,7 @@ std::string toHexStr(const uint8_t* data, size_t len)
     return ss.str();
 }
 
-// List all Skylanders in the database
+// List all Skylanders in the database (sorted by game, type, element, name)
 void listSkylanders(const std::string& filter = "")
 {
     const xk::SkylanderInfo* db = xk::skylanderDB::getDatabase();
@@ -47,15 +48,8 @@ void listSkylanders(const std::string& filter = "")
     std::transform(lowerFilter.begin(), lowerFilter.end(), lowerFilter.begin(),
         [](unsigned char c) { return std::tolower(c); });
 
-    std::cout << "=== Skylander Database ===" << std::endl;
-    std::cout << std::left << std::setw(6) << "ID"
-              << std::setw(30) << "Name"
-              << std::setw(18) << "Type"
-              << std::setw(10) << "Element"
-              << "Game" << std::endl;
-    std::cout << std::string(90, '-') << std::endl;
-
-    int displayed = 0;
+    // Collect entries into a vector for sorting
+    std::vector<const xk::SkylanderInfo*> entries;
     for (size_t i = 0; i < count; i++)
     {
         if (db[i].name == nullptr) continue;
@@ -85,16 +79,38 @@ void listSkylanders(const std::string& filter = "")
             }
         }
 
-        std::cout << std::left << std::setw(6) << db[i].id
-                  << std::setw(30) << db[i].name
-                  << std::setw(18) << xk::skylanderDB::getTypeString(db[i].type)
-                  << std::setw(10) << xk::skylanderDB::getElementString(db[i].element)
-                  << xk::skylanderDB::getGameString(db[i].game) << std::endl;
-        displayed++;
+        entries.push_back(&db[i]);
+    }
+
+    // Sort by game, type, element, name
+    std::sort(entries.begin(), entries.end(),
+        [](const xk::SkylanderInfo* a, const xk::SkylanderInfo* b) {
+            if (a->game != b->game) return a->game < b->game;
+            if (a->type != b->type) return a->type < b->type;
+            if (a->element != b->element) return a->element < b->element;
+            return strcmp(a->name, b->name) < 0;
+        });
+
+    std::cout << "=== Skylander Database ===" << std::endl;
+    std::cout << std::left << std::setw(18) << "Game"
+              << std::setw(18) << "Type"
+              << std::setw(10) << "Element"
+              << std::setw(30) << "Name"
+              << "ID" << std::endl;
+    std::cout << std::string(90, '-') << std::endl;
+
+    for (const auto* entry : entries)
+    {
+        std::cout << std::left
+                  << std::setw(18) << xk::skylanderDB::getGameString(entry->game)
+                  << std::setw(18) << xk::skylanderDB::getTypeString(entry->type)
+                  << std::setw(10) << xk::skylanderDB::getElementString(entry->element)
+                  << std::setw(30) << entry->name
+                  << entry->id << std::endl;
     }
 
     std::cout << std::string(90, '-') << std::endl;
-    std::cout << "Total: " << displayed << " Skylanders";
+    std::cout << "Total: " << entries.size() << " Skylanders";
     if (!filter.empty())
         std::cout << " (filtered from " << count << ")";
     std::cout << std::endl;
