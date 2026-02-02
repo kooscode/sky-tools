@@ -74,13 +74,13 @@ sky-identify: $(OUT_DIR) $(OBJ_DIR)/skylanderDB.o
 		-o $(OUT_DIR)/sky-identify \
 		-I$(LIB_DIR)
 
-# Build sky-make (create new Skylanders from scratch)
-sky-make: $(OUT_DIR) $(LIB_OBJECTS)
+# Build sky-make (create new Skylander dump files - no NFC reader required)
+sky-make: $(OUT_DIR) $(OBJ_DIR)/skylanderDB.o $(OBJ_DIR)/skylanderCrypto.o $(OBJ_DIR)/hatDB.o
 	$(CXX) $(CFLAGS) -std=$(CPP_STD) $(DEFS) \
 		sky-make/src/sky-make.cpp \
-		$(LIB_OBJECTS) \
+		$(OBJ_DIR)/skylanderDB.o $(OBJ_DIR)/skylanderCrypto.o $(OBJ_DIR)/hatDB.o \
 		-o $(OUT_DIR)/sky-make \
-		$(INCLUDES) $(LIBS)
+		-I$(LIB_DIR)
 
 # Clean build artifacts
 clean:

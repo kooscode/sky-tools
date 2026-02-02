@@ -1,6 +1,6 @@
 /*
  * sky-make - Create new Skylanders from scratch
- * Interactive tool to build custom Skylander NFC data
+ * Generates .bin files that can be written with sky-clone
  */
 
 #include <iostream>
@@ -14,8 +14,6 @@
 #include <random>
 
 #include "cxxopts.hpp"
-#include "appError.hpp"
-#include "acr122u.hpp"
 #include "skylanderNFC.hpp"
 #include "skylanderDB.hpp"
 #include "skylanderCrypto.hpp"
@@ -34,20 +32,18 @@ struct SkylanderConfig
     uint8_t heroPoints = 0;
     uint32_t heroicChallenges = 0;
     std::string customName;
-    uint8_t uid[4] = {0};
-    bool hasUID = false;
 };
 
 // Forward declarations
 void printBanner();
-bool interactiveMode(SkylanderConfig& config);
-bool buildSkylander(const SkylanderConfig& config, uint8_t* data);
+bool interactiveMode(SkylanderConfig& config, std::string& outputFile);
+bool buildSkylander(const SkylanderConfig& config, uint8_t* data, uint8_t* outUID);
 void initSector0(uint8_t* data, const uint8_t* uid, uint16_t charId, uint16_t variantId);
 void initSectorTrailers(uint8_t* data, const uint8_t* uid);
 void initDataArea(uint8_t* data, uint8_t areaBlock, const SkylanderConfig& config);
 void generateRandomUID(uint8_t* uid);
-bool writeToNFC(const uint8_t* data);
 bool writeToFile(const uint8_t* data, const std::string& filename);
+std::string generateFilename(const xk::SkylanderInfo* info, uint16_t charId, const uint8_t* uid);
 int selectFromMenu(const std::string& prompt, const std::vector<std::string>& options);
 uint32_t getNumberInput(const std::string& prompt, uint32_t min, uint32_t max, uint32_t defaultVal);
 std::string getStringInput(const std::string& prompt, size_t maxLen);
@@ -60,10 +56,10 @@ int main(int argc, char** argv)
     bool interactive = true;
 
     // Setup command line options
-    cxxopts::Options app_options("sky-make", "Skylander Creation Tool - Create new Skylanders from scratch");
+    cxxopts::Options app_options("sky-make", "Skylander Creation Tool - Create new Skylander dump files");
     app_options.add_options()
         ("i,interactive", "Interactive mode (default)")
-        ("o,output", "Output to BIN file instead of NFC card", cxxopts::value<std::string>())
+        ("o,output", "Output filename (auto-generated if not specified)", cxxopts::value<std::string>())
         ("c,character", "Character ID or name", cxxopts::value<std::string>())
         ("x,xp", "XP value (0-16777215)", cxxopts::value<uint32_t>())
         ("m,money", "Money value (0-65535)", cxxopts::value<uint16_t>())
@@ -88,6 +84,7 @@ int main(int argc, char** argv)
     if (params.count("help"))
     {
         std::cout << app_options.help() << std::endl;
+        std::cout << "Output files can be written to NFC cards using sky-clone." << std::endl;
         return 0;
     }
 
@@ -146,7 +143,7 @@ int main(int argc, char** argv)
     if (interactive)
     {
         printBanner();
-        if (!interactiveMode(config))
+        if (!interactiveMode(config, outputFile))
         {
             std::cout << "Cancelled." << std::endl;
             return 0;
@@ -163,40 +160,32 @@ int main(int argc, char** argv)
 
     // Build Skylander data
     uint8_t data[1024];
+    uint8_t uid[4];
     memset(data, 0, sizeof(data));
 
-    if (!buildSkylander(config, data))
+    if (!buildSkylander(config, data, uid))
     {
         std::cerr << "Failed to build Skylander data" << std::endl;
         return -1;
     }
 
-    // Output
-    if (!outputFile.empty())
+    // Generate filename if not specified
+    if (outputFile.empty())
     {
-        if (writeToFile(data, outputFile))
-        {
-            std::cout << "Skylander written to: " << outputFile << std::endl;
-            return 0;
-        }
-        else
-        {
-            std::cerr << "Failed to write file: " << outputFile << std::endl;
-            return -1;
-        }
+        outputFile = generateFilename(info, config.characterId, uid);
+    }
+
+    // Write to file
+    if (writeToFile(data, outputFile))
+    {
+        std::cout << "Skylander dump created: " << outputFile << std::endl;
+        std::cout << "Use sky-clone to write this file to an NFC card." << std::endl;
+        return 0;
     }
     else
     {
-        if (writeToNFC(data))
-        {
-            std::cout << "Skylander written to NFC card successfully!" << std::endl;
-            return 0;
-        }
-        else
-        {
-            std::cerr << "Failed to write to NFC card" << std::endl;
-            return -1;
-        }
+        std::cerr << "Failed to write file: " << outputFile << std::endl;
+        return -1;
     }
 }
 
@@ -208,7 +197,7 @@ void printBanner()
     std::cout << std::endl;
 }
 
-bool interactiveMode(SkylanderConfig& config)
+bool interactiveMode(SkylanderConfig& config, std::string& outputFile)
 {
     // Step 1: Select Game
     std::cout << "STEP 1: Select Game/Generation" << std::endl;
@@ -487,6 +476,66 @@ void generateRandomUID(uint8_t* uid)
     }
 }
 
+std::string generateFilename(const xk::SkylanderInfo* info, uint16_t charId, const uint8_t* uid)
+{
+    std::string filename;
+
+    if (info)
+    {
+        std::string game = xk::skylanderDB::getGameString(info->game);
+        std::string element = xk::skylanderDB::getElementString(info->element);
+
+        // For Creation Crystals and Traps, use type_game_element_uid
+        if (info->type == xk::SKY_TYPE_CREATION_CRYSTAL || info->type == xk::SKY_TYPE_TRAP)
+        {
+            std::string type = xk::skylanderDB::getTypeString(info->type);
+            filename = type + "_" + game + "_" + element;
+        }
+        else
+        {
+            // Regular Skylanders: name_game_element_uid
+            filename = std::string(info->name) + "_" + game + "_" + element;
+        }
+    }
+    else
+    {
+        // Unknown Skylander - use ID
+        char buf[32];
+        snprintf(buf, sizeof(buf), "unknown_%04X", charId);
+        filename = buf;
+    }
+
+    // Add UID for uniqueness
+    filename += "_" + xk::skylanderNFC::toHexStr(uid, 4);
+
+    // Convert to lowercase and replace spaces/special chars with underscores
+    std::transform(filename.begin(), filename.end(), filename.begin(), [](unsigned char c) {
+        if (c == ' ' || c == '-' || c == '.' || c == '\'')
+            return (int)'_';
+        return (int)std::tolower(c);
+    });
+
+    // Remove consecutive underscores
+    std::string result;
+    bool lastWasUnderscore = false;
+    for (char c : filename)
+    {
+        if (c == '_')
+        {
+            if (!lastWasUnderscore)
+                result += c;
+            lastWasUnderscore = true;
+        }
+        else
+        {
+            result += c;
+            lastWasUnderscore = false;
+        }
+    }
+
+    return result + ".bin";
+}
+
 void initSector0(uint8_t* data, const uint8_t* uid, uint16_t charId, uint16_t variantId)
 {
     // Block 0: UID and manufacturer data
@@ -622,18 +671,14 @@ void initDataArea(uint8_t* data, uint8_t areaBlock, const SkylanderConfig& confi
     heroBlock[6] = config.heroPoints;
 }
 
-bool buildSkylander(const SkylanderConfig& config, uint8_t* data)
+bool buildSkylander(const SkylanderConfig& config, uint8_t* data, uint8_t* outUID)
 {
-    // Generate or use provided UID
+    // Generate random UID
     uint8_t uid[4];
-    if (config.hasUID)
-    {
-        memcpy(uid, config.uid, 4);
-    }
-    else
-    {
-        generateRandomUID(uid);
-    }
+    generateRandomUID(uid);
+
+    // Copy UID to output
+    memcpy(outUID, uid, 4);
 
     std::cout << "Building Skylander with UID: "
               << xk::skylanderNFC::toHexStr(uid, 4) << std::endl;
@@ -669,139 +714,4 @@ bool writeToFile(const uint8_t* data, const std::string& filename)
     file.write(reinterpret_cast<const char*>(data), 1024);
     file.close();
     return true;
-}
-
-bool writeToNFC(const uint8_t* data)
-{
-    try
-    {
-        xk::acr122u nfc;
-
-        std::cout << "Looking for ACR122U NFC Reader/Writer..." << std::endl;
-        std::string readerName = nfc.findAndConnect();
-        std::cout << "  Found: " << readerName << std::endl;
-        std::cout << "  Connected." << std::endl;
-
-        // Try to authenticate with default key first (blank card)
-        const uint8_t DEFAULTKEY[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-        xk::acr122u::NFC_Sector sector0;
-        memcpy(sector0.key_A, DEFAULTKEY, 6);
-
-        uint32_t retval = nfc.sectorAuthKeyA(0, sector0.key_A);
-        if (retval != NFC_OK)
-        {
-            std::cout << "Card authentication failed. Is this a blank card?" << std::endl;
-            std::cout << "Note: Cannot overwrite existing Skylanders for safety." << std::endl;
-            return false;
-        }
-
-        // Read current sector 0 to get card UID
-        retval = nfc.sectorRead(0, sector0);
-        if (retval != NFC_OK)
-        {
-            std::cout << "Failed to read card." << std::endl;
-            return false;
-        }
-
-        uint8_t cardUID[4];
-        memcpy(cardUID, sector0.blk0, 4);
-        std::cout << "Card UID: " << xk::skylanderNFC::toHexStr(cardUID, 4) << std::endl;
-
-        // Rebuild Skylander data with card's actual UID
-        uint8_t newData[1024];
-        memcpy(newData, data, 1024);
-
-        // Update UID in the data
-        memcpy(newData, cardUID, 4);
-        newData[4] = cardUID[0] ^ cardUID[1] ^ cardUID[2] ^ cardUID[3];  // BCC
-
-        // Recalculate sector trailers with correct UID
-        initSectorTrailers(newData, cardUID);
-
-        // Decrypt, update checksums, re-encrypt
-        xk::skylanderCrypto::decryptSkylander(newData);
-        xk::skylanderCrypto::updateAreaChecksums(newData, 0x08);
-        xk::skylanderCrypto::updateAreaChecksums(newData, 0x24);
-        xk::skylanderCrypto::encryptSkylander(newData);
-
-        // Write all sectors
-        std::cout << "Writing sectors..." << std::endl;
-        xk::acr122u::NFC_Sector writeSector;
-
-        for (int sec = 0; sec < 16; sec++)
-        {
-            // Copy sector data
-            memcpy(&writeSector, newData + sec * 64, 64);
-
-            // Authenticate
-            if (sec == 0)
-            {
-                memcpy(writeSector.key_A, DEFAULTKEY, 6);
-            }
-            else
-            {
-                uint64_t sectorKey = xk::skylanderNFC::makeSkyKey(sec, cardUID);
-                memcpy(writeSector.key_A, &sectorKey, 6);
-            }
-
-            // For sector 0, only write blocks 1-2 (block 0 is read-only UID, block 3 is trailer)
-            // For other sectors, write blocks 0-2 (block 3 is trailer)
-            if (sec == 0)
-            {
-                // Authenticate with default key
-                retval = nfc.sectorAuthKeyA(0, (uint8_t*)DEFAULTKEY);
-                if (retval != NFC_OK)
-                {
-                    std::cout << "Auth failed for sector 0" << std::endl;
-                    return false;
-                }
-
-                // Write blocks 1 and 2 only
-                retval = nfc.sectorWrite(0, writeSector, 1, 2);
-                if (retval != NFC_OK)
-                {
-                    std::cout << "Write failed for sector 0" << std::endl;
-                    return false;
-                }
-
-                // Write sector trailer to convert to Skylander keys
-                retval = nfc.sectorWrite(0, writeSector, 3, 1);
-                if (retval != NFC_OK)
-                {
-                    std::cout << "Failed to write sector 0 trailer" << std::endl;
-                    return false;
-                }
-            }
-            else
-            {
-                // For other sectors, use default key first (blank card)
-                retval = nfc.sectorAuthKeyA(sec, (uint8_t*)DEFAULTKEY);
-                if (retval != NFC_OK)
-                {
-                    std::cout << "Auth failed for sector " << sec << std::endl;
-                    return false;
-                }
-
-                // Write all 4 blocks
-                retval = nfc.sectorWrite(sec, writeSector);
-                if (retval != NFC_OK)
-                {
-                    std::cout << "Write failed for sector " << sec << std::endl;
-                    return false;
-                }
-            }
-
-            std::cout << "." << std::flush;
-        }
-        std::cout << std::endl;
-
-        nfc.deviceDisconnect();
-        return true;
-    }
-    catch (xk::appError* e)
-    {
-        std::cout << "Error: " << e->what() << std::endl;
-        delete e;
-        return false;
-    }
 }
