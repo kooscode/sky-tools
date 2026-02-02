@@ -9,7 +9,7 @@ LIB_DIR = lib
 OBJ_DIR = obj
 
 # Tools
-TOOLS = sky-dump sky-clone sky-reset sky-identify
+TOOLS = sky-dump sky-clone sky-reset sky-identify sky-make
 
 # Compiler settings
 CXX = g++
@@ -27,7 +27,7 @@ LIB_SOURCES = $(wildcard $(LIB_DIR)/*.cpp)
 LIB_OBJECTS = $(patsubst $(LIB_DIR)/%.cpp,$(OBJ_DIR)/%.o,$(LIB_SOURCES))
 
 # Default target: build all tools
-.PHONY: all clean sky-dump sky-clone sky-reset sky-identify
+.PHONY: all clean sky-dump sky-clone sky-reset sky-identify sky-make
 
 all: $(TOOLS)
 
@@ -74,10 +74,18 @@ sky-identify: $(OUT_DIR) $(OBJ_DIR)/skylanderDB.o
 		-o $(OUT_DIR)/sky-identify \
 		-I$(LIB_DIR)
 
+# Build sky-make (create new Skylanders from scratch)
+sky-make: $(OUT_DIR) $(LIB_OBJECTS)
+	$(CXX) $(CFLAGS) -std=$(CPP_STD) $(DEFS) \
+		sky-make/src/sky-make.cpp \
+		$(LIB_OBJECTS) \
+		-o $(OUT_DIR)/sky-make \
+		$(INCLUDES) $(LIBS)
+
 # Clean build artifacts
 clean:
 	rm -rf $(OBJ_DIR)
-	rm -f $(OUT_DIR)/sky-dump $(OUT_DIR)/sky-clone $(OUT_DIR)/sky-reset $(OUT_DIR)/sky-identify
+	rm -f $(OUT_DIR)/sky-dump $(OUT_DIR)/sky-clone $(OUT_DIR)/sky-reset $(OUT_DIR)/sky-identify $(OUT_DIR)/sky-make
 
 # Install dependencies (Debian/Ubuntu)
 install-deps:
@@ -93,6 +101,7 @@ help:
 	@echo "  sky-clone    - Build sky-clone only"
 	@echo "  sky-reset    - Build sky-reset only"
 	@echo "  sky-identify - Build sky-identify only"
+	@echo "  sky-make     - Build sky-make only"
 	@echo "  clean        - Remove build artifacts"
 	@echo "  install-deps - Install required dependencies (Debian/Ubuntu)"
 	@echo "  help         - Show this help message"

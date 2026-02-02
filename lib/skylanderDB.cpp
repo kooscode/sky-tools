@@ -7,6 +7,8 @@
  */
 
 #include "skylanderDB.hpp"
+#include <algorithm>
+#include <cctype>
 
 namespace xk
 {
@@ -459,5 +461,37 @@ namespace xk
     bool skylanderDB::isVehicle(uint16_t characterId)
     {
         return (characterId >= 3220 && characterId <= 3241);
+    }
+
+    const SkylanderInfo* skylanderDB::getDatabase()
+    {
+        return SKYLANDER_DATABASE;
+    }
+
+    size_t skylanderDB::getDatabaseSize()
+    {
+        return DATABASE_SIZE;
+    }
+
+    const SkylanderInfo* skylanderDB::findByName(const std::string& name)
+    {
+        // Case-insensitive search
+        std::string lowerName = name;
+        std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(),
+            [](unsigned char c) { return std::tolower(c); });
+
+        for (size_t i = 0; i < DATABASE_SIZE; i++)
+        {
+            if (SKYLANDER_DATABASE[i].name == nullptr)
+                continue;
+
+            std::string dbName = SKYLANDER_DATABASE[i].name;
+            std::transform(dbName.begin(), dbName.end(), dbName.begin(),
+                [](unsigned char c) { return std::tolower(c); });
+
+            if (dbName == lowerName)
+                return &SKYLANDER_DATABASE[i];
+        }
+        return nullptr;
     }
 }

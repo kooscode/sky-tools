@@ -117,6 +117,15 @@ namespace xk
 
         // Check if this is a Vehicle
         static bool isVehicle(uint16_t characterId);
+
+        // Get the full database array
+        static const SkylanderInfo* getDatabase();
+
+        // Get the number of entries in the database
+        static size_t getDatabaseSize();
+
+        // Find Skylander by name (case-insensitive)
+        static const SkylanderInfo* findByName(const std::string& name);
     };
 }
 
