@@ -95,7 +95,7 @@ void listSkylanders(const std::string& filter = "")
     std::cout << std::left << std::setw(18) << "Game"
               << std::setw(18) << "Type"
               << std::setw(10) << "Element"
-              << std::setw(30) << "Name"
+              << std::setw(30) << "Skylander Name"
               << "ID" << std::endl;
     std::cout << std::string(90, '-') << std::endl;
 
